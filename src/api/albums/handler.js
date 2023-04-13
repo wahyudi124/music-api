@@ -1,9 +1,12 @@
 const autoBind = require('auto-bind');
 
 class AlbumsHandler {
-  constructor(service, validator) {
+  constructor(service, likeService, storageService, validator, uploadValidator) {
     this._service = service;
+    this._likeService = likeService;
+    this._storageService = storageService;
     this._validator = validator;
+    this._uploadValidator = uploadValidator;
     autoBind(this);
   }
 
@@ -55,6 +58,66 @@ class AlbumsHandler {
       status: 'success',
       message: 'Album berhasil dihapus',
     };
+  }
+
+  async postLikeAlbumHandler(request, h) {
+    const { id } = request.params;
+    const { id: credentialId } = request.auth.credentials;
+    await this._likeService.verifyUserIdAndAlbumId(credentialId, id);
+    await this._likeService.verifyAlbumAlreadyLikes(credentialId, id);
+    await this._likeService.likeAlbum(id, credentialId);
+    const response = h.response({
+      status: 'success',
+      message: 'Album telah disukai',
+    });
+    response.code(201);
+    return response;
+  }
+
+  async deleteLikeAlbumHanlder(request, h) {
+    const { id } = request.params;
+    const { id: credentialId } = request.auth.credentials;
+    await this._likeService.verifyUserIdAndAlbumId(credentialId, id);
+    await this._likeService.unlikeAlbum(id, credentialId);
+    return {
+      status: 'success',
+      message: 'Album tidak disukai',
+    };
+  }
+
+  async getTotalLikeAlbumsHandler(request, h) {
+    const { id } = request.params;
+
+    await this._likeService.veryfyAlbumId(id);
+    const likes = await this._likeService.getAlbumTotalLike(id);
+    const response = h.response({
+      status: 'success',
+      data: { likes: likes.totalLike },
+    });
+    response.header('X-Data-Source', likes.from);
+    return response;
+  }
+
+  async postAlbumCoverHandler(request, h) {
+    const { cover } = request.payload;
+    const { id } = request.params;
+
+    this._uploadValidator.validateImageHeaders(cover.hapi.headers);
+    const replasefilename = cover.hapi.filename.replace(/\s+/g, '-');
+    cover.hapi.filename = replasefilename;
+    const filename = await this._storageService.writeFile(cover, cover.hapi);
+
+    // Using  local Storege
+    // const pathfile = `http://${process.env.HOST}:${process.env.PORT}/albums/images/${filename}`;
+
+    await this._service.addAlbumCover(id, filename);
+
+    const response = h.response({
+      status: 'success',
+      message: 'Sampul berhasil diunggah',
+    });
+    response.code(201);
+    return response;
   }
 }
 

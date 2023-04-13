@@ -2,11 +2,22 @@ const Hapi = require('@hapi/hapi');
 const CatchEvent = require('./extensions/index');
 require('dotenv').config();
 const Jwt = require('@hapi/jwt');
+const path = require('path');
+const Inert = require('@hapi/inert');
 
 // albums
 const albums = require('./api/albums');
 const AlbumsServices = require('./services/AlbumsServices');
 const AlbumsValidator = require('./validator/albums');
+const LikesService = require('./services/LikesService');
+
+// Using Local Storage
+// const StorageService = require('./services/StorageService');
+
+const UploadsValidator = require('./validator/uploads');
+const CacheService = require('./services/CacheService');
+
+const StorageServiceS3 = require('./services/AWSS3Service');
 
 // song
 const SongsValidator = require('./validator/songs');
@@ -28,6 +39,11 @@ const AuthenticationsValidator = require('./validator/authentications');
 const playlist = require('./api/playlist');
 const PlayListService = require('./services/PlaylistService');
 const PlaylistValidator = require('./validator/playlist');
+
+// export
+const exportsApi = require('./api/exports');
+const ProducerService = require('./services/ProducerService');
+const ExportsValidator = require('./validator/exports');
 
 // colab
 const collaborations = require('./api/collaborations');
@@ -52,6 +68,10 @@ const init = async () => {
     usersService,
     collaborationsService,
   );
+  const cacheService = new CacheService();
+  const likeService = new LikesService(cacheService);
+  // const storageService = new StorageService(path.resolve(__dirname, 'api/albums/file/images'));
+  const storageService = new StorageServiceS3();
 
   const server = Hapi.server({
     port: process.env.PORT,
@@ -67,6 +87,9 @@ const init = async () => {
   await server.register([
     {
       plugin: Jwt,
+    },
+    {
+      plugin: Inert,
     },
   ]);
 
@@ -90,7 +113,10 @@ const init = async () => {
     plugin: albums,
     options: {
       service: albumsService,
+      likeService,
+      storageService,
       validator: AlbumsValidator,
+      uploadValidator: UploadsValidator,
     },
   }, {
     plugin: songs,
@@ -132,6 +158,14 @@ const init = async () => {
       validator: AuthenticationsValidator,
     },
 
+  },
+  {
+    plugin: exportsApi,
+    options: {
+      pubService: ProducerService,
+      playlistService,
+      validator: ExportsValidator,
+    },
   },
   ]);
 

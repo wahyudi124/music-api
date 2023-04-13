@@ -15,8 +15,8 @@ class AlbumsServices {
     const updatedAt = createdAt;
 
     const query = {
-      text: 'INSERT INTO albums VALUES($1,$2,$3,$4,$5) RETURNING id',
-      values: [id, name, year, createdAt, updatedAt],
+      text: 'INSERT INTO albums VALUES($1,$2,$3,$4,$5,$6) RETURNING id',
+      values: [id, name, year, createdAt, updatedAt, null],
     };
 
     // this._pool.query(query);
@@ -31,7 +31,7 @@ class AlbumsServices {
 
   async getAlbumById(id) {
     const query = {
-      text: `SELECT albums.id, albums.name, albums.year, songs.id AS song_id, songs.title, songs.performer 
+      text: `SELECT albums.id, albums.name, albums.year,albums.cover, songs.id AS song_id, songs.title, songs.performer 
       FROM albums 
       LEFT JOIN songs ON albums.id = songs.album_id 
       WHERE albums.id = $1`,
@@ -48,6 +48,7 @@ class AlbumsServices {
       id: result.rows[0].id,
       name: result.rows[0].name,
       year: result.rows[0].year,
+      coverUrl: result.rows[0].cover,
       songs: [],
     };
 
@@ -88,6 +89,18 @@ class AlbumsServices {
 
     if (!result.rows.length) {
       throw new NotFoundError('Album gagal dihapus. Id tidak ditemukan');
+    }
+  }
+
+  async addAlbumCover(albumId, url) {
+    const query1 = {
+      text: 'UPDATE albums SET cover = $1 WHERE id = $2 ',
+      values: [url, albumId],
+    };
+
+    const result1 = await this._pool.query(query1);
+    if (result1.rowCount === 0) {
+      throw new NotFoundError('Gagal memperbarui Cover. Id tidak ditemukan');
     }
   }
 }
